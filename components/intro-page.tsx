@@ -18,18 +18,31 @@ export default function IntroPage() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (window.localStorage.getItem(SKIP_KEY) === 'true') router.replace('/simulator')
-    else setReady(true)
+    try {
+      if (window.localStorage.getItem(SKIP_KEY) === 'true') {
+        router.replace('/simulator')
+        return
+      }
+    } catch {
+      // Storage is optional; the intro remains usable when it is unavailable.
+    }
+    setReady(true)
   }, [router])
 
   const launch = (airport: string, start: string, end: string, remember = false) => {
-    if (remember) window.localStorage.setItem(SKIP_KEY, 'true')
+    if (remember) {
+      try {
+        window.localStorage.setItem(SKIP_KEY, 'true')
+      } catch {
+        // Continue to the simulator even when the preference cannot be saved.
+      }
+    }
     router.push(`/simulator?airport=${airport}&start=${start}&end=${end}`)
   }
 
   return <main className="intro-page">
     <RouteBackdrop />
-    <header className="intro-topbar"><a className="intro-brand" href="/" aria-label="Domino Sky home"><span className="intro-brand-mark"><Plane size={19}/></span><span>DOMINO <b>SKY</b></span></a><a className="intro-github" href="https://github.com/aryan-and-team/v0-domino-sky-simulator-smKXH9PS2nC" target="_blank" rel="noreferrer"><GitBranch size={17}/> Source <ArrowRight size={14}/></a></header>
+    <header className="intro-topbar"><a className="intro-brand" href="/" aria-label="Domino Sky home"><span className="intro-brand-mark"><Plane size={19}/></span><span>DOMINO <b>SKY</b></span></a><a className="intro-github" href="https://github.com/Aryansingh-vs/Domino-sky" target="_blank" rel="noreferrer"><GitBranch size={17}/> Source <ArrowRight size={14}/></a></header>
     <section className="intro-hero" aria-labelledby="intro-heading">
       <p className="intro-kicker"><span className="intro-live-dot"/> INDIAN DOMESTIC NETWORK SIMULATOR</p>
       <h1 id="intro-heading">A storm in Mumbai<br/><span>can delay a flight</span><br/>in Kolkata.</h1>
@@ -38,6 +51,6 @@ export default function IntroPage() {
       <div className="intro-actions"><button className="intro-primary" onClick={() => launch('DEL', '12:00', '13:30')} disabled={!ready}>Start simulator <ArrowRight size={18}/></button><button className="intro-secondary" onClick={() => launch('BOM', '09:00', '10:30')} disabled={!ready}>Try the Mumbai storm demo</button></div>
       <button className="intro-skip" onClick={() => launch('DEL', '12:00', '13:30', true)}>Skip intro <ArrowRight size={14}/></button>
     </section>
-    <footer className="intro-footer"><span>REAL SCHEDULE · DETERMINISTIC OUTCOMES · NO LOGIN REQUIRED</span><a href="https://github.com/aryan-and-team/v0-domino-sky-simulator-smKXH9PS2nC" target="_blank" rel="noreferrer">View project on GitHub <ArrowRight size={13}/></a></footer>
+    <footer className="intro-footer"><span>REAL SCHEDULE · DETERMINISTIC OUTCOMES · NO LOGIN REQUIRED</span><a href="https://github.com/Aryansingh-vs/Domino-sky" target="_blank" rel="noreferrer">View project on GitHub <ArrowRight size={13}/></a></footer>
   </main>
 }

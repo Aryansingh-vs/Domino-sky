@@ -1,3 +1,5 @@
+import { airports, schedule, spareAircraft, toMinutes, type Action, type Scenario } from "./index"
+
 export type DispatcherPayload = {
   recommended_action_id: string
   summary: string
@@ -6,6 +8,32 @@ export type DispatcherPayload = {
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat("en-US").format(value)
+
+export function isScenario(value: unknown): value is Scenario {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const scenario = value as Record<string, unknown>
+  if (typeof scenario.airport !== "string" || typeof scenario.start !== "string" || typeof scenario.end !== "string") return false
+  const validTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+  return airports.some(airport => airport.id === scenario.airport)
+    && validTime.test(scenario.start)
+    && validTime.test(scenario.end)
+    && toMinutes(scenario.start) <= toMinutes(scenario.end)
+}
+
+export function isAction(value: unknown): value is Action {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const action = value as Record<string, unknown>
+  if (action.type === "cancel_flight") {
+    return typeof action.flightId === "string" && schedule.some(flight => flight.flight_id === action.flightId)
+  }
+  if (action.type === "swap_spare") {
+    return typeof action.spareTail === "string"
+      && spareAircraft.some(spare => spare.tail_id === action.spareTail)
+      && typeof action.flightId === "string"
+      && schedule.some(flight => flight.flight_id === action.flightId)
+  }
+  return false
+}
 
 function engineNumbers(value: unknown, numbers = new Set<string>()): Set<string> {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -42,8 +70,7 @@ function extractNumbers(text: string): string[] {
 
 export function validateNumbers(payload: DispatcherPayload, engineOutput: unknown): { valid: boolean; invalid: string[] } {
   const allowed = engineNumbers(engineOutput)
-  const allowedIdentifiers = collectIdentifiersAndTimes(engineOutput).identifiers
-  const allowedTimes = collectIdentifiersAndTimes(engineOutput).times
+  const { identifiers: allowedIdentifiers, times: allowedTimes } = collectIdentifiersAndTimes(engineOutput)
   const citedStrings = payload.numbers_cited.filter((value): value is string => typeof value === "string")
   const prose = [payload.summary, ...payload.why, ...citedStrings]
   const citedNumbers = payload.numbers_cited.flatMap(value => typeof value === "number" ? [String(value), formatNumber(value)] : extractNumbers(value))
@@ -62,7 +89,15 @@ export function isDispatcherPayload(value: unknown): value is DispatcherPayload 
   if (!value || typeof value !== "object") return false
   const payload = value as Record<string, unknown>
   return typeof payload.recommended_action_id === "string"
+    && payload.recommended_action_id.length <= 80
     && typeof payload.summary === "string"
-    && Array.isArray(payload.why) && payload.why.every(item => typeof item === "string")
-    && Array.isArray(payload.numbers_cited) && payload.numbers_cited.every(item => typeof item === "number" || typeof item === "string")
+    && payload.summary.length <= 1200
+    && Array.isArray(payload.why)
+    && payload.why.length <= 8
+    && payload.why.every(item => typeof item === "string" && item.length <= 500)
+    && Array.isArray(payload.numbers_cited)
+    && payload.numbers_cited.length <= 24
+    && payload.numbers_cited.every(item => typeof item === "string"
+      ? item.length <= 80
+      : typeof item === "number" && Number.isFinite(item))
 }

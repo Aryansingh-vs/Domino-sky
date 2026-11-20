@@ -9,6 +9,7 @@ import type { Candidate } from "@/src/engine/recovery"
 type DispatcherResponse = { explanation?: { recommended_action_id: string; summary: string; why: string[]; numbers_cited: Array<number | string> }; verified?: boolean; template?: boolean }
 const fetcher = async (key: string): Promise<DispatcherResponse> => {
   const response = await fetch("/api/dispatcher", { method: "POST", headers: { "Content-Type": "application/json" }, body: key })
+  if (!response.ok) throw new Error("Dispatcher explanation request failed.")
   return response.json()
 }
 
@@ -16,6 +17,7 @@ export default function DispatcherPanel({ scenario, current, baseline, recommend
   const { data, isLoading } = useSWR(JSON.stringify({ scenario }), fetcher, { revalidateOnFocus: false, keepPreviousData: true })
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
+  const [answerVerified, setAnswerVerified] = useState(false)
   const [chatPending, setChatPending] = useState(false)
   const explanation = data?.explanation
   const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
@@ -25,11 +27,20 @@ export default function DispatcherPanel({ scenario, current, baseline, recommend
     setChatPending(true)
     try {
       const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario, question: text, actions: activeAction ? [activeAction] : [] }) })
-      const payload = await response.json()
-      setAnswer(payload.answer ?? "I could not verify an answer from this scenario.")
-    } catch { setAnswer("I could not verify an answer from this scenario.") }
-    setQuestion("")
-    setChatPending(false)
+      if (!response.ok) throw new Error("Question request failed.")
+      const payload: unknown = await response.json()
+      if (!payload || typeof payload !== "object" || !("answer" in payload) || typeof payload.answer !== "string") {
+        throw new Error("The dispatcher returned an invalid answer.")
+      }
+      setAnswer(payload.answer)
+      setAnswerVerified("verified" in payload && payload.verified === true)
+    } catch {
+      setAnswer("I could not verify an answer from this scenario.")
+      setAnswerVerified(false)
+    } finally {
+      setQuestion("")
+      setChatPending(false)
+    }
   }
   const afterMetrics = activeAction ? current : baseline
   return <section className="panel dispatcher-panel" aria-labelledby="dispatcher-title">
@@ -49,6 +60,6 @@ export default function DispatcherPanel({ scenario, current, baseline, recommend
         {([ ["Delay minutes", baseline.totalDepDelayMinutes, afterMetrics.totalDepDelayMinutes], ["Stranded pax", baseline.strandedPax, afterMetrics.strandedPax], ["Crew breaches", baseline.crewBreaches, afterMetrics.crewBreaches], ["Cancellations", baseline.cancelledFlights, afterMetrics.cancelledFlights] ] as Array<[string, number, number]>).map(([label, before, after]) => <div className="delta-row" key={label}><strong>{label}</strong><span>{before}</span><span>{after}</span><b className={after < before ? "delta-good" : after > before ? "delta-bad" : ""}>{after - before === 0 ? "—" : `${after - before > 0 ? "+" : ""}${after - before}`}</b></div>)}
       </div>
     </div>
-    <form className="dispatcher-chat" onSubmit={submitQuestion}><label htmlFor="dispatcher-question">Ask about this simulation</label><div className="chat-input-wrap"><input id="dispatcher-question" value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && (event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault() }} placeholder="Why is DS0204 late?" maxLength={300}/><button aria-label="Send question" disabled={!question.trim() || chatPending}>{chatPending ? <LoaderCircle size={15} className="spin"/> : <CornerDownLeft size={15}/>}</button></div>{answer && <p className="chat-answer" role="status">{answer} <span>· verified against engine</span></p>}</form>
+    <form className="dispatcher-chat" onSubmit={submitQuestion}><label htmlFor="dispatcher-question">Ask about this simulation</label><div className="chat-input-wrap"><input id="dispatcher-question" value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && (event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault() }} placeholder="Why is DS0204 late?" maxLength={300}/><button aria-label="Send question" disabled={!question.trim() || chatPending}>{chatPending ? <LoaderCircle size={15} className="spin"/> : <CornerDownLeft size={15}/>}</button></div>{answer && <p className="chat-answer" role="status">{answer} <span>· {answerVerified ? "verified against engine" : "not verified"}</span></p>}</form>
   </section>
 }

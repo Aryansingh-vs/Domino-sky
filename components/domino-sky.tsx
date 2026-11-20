@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Activity, ArrowRight, CircleHelp, Plane, RotateCcw, Sun, Moon } from "lucide-react"
 import FlightTimeline from "@/components/flight-timeline"
 import FlightDetail from "@/components/flight-detail"
@@ -45,7 +45,7 @@ export default function DominoSky({ initialScenario = getInitialScenario() }: { 
   const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null)
   const [replayMinute, setReplayMinute] = useState(12 * 60)
   const [playing, setPlaying] = useState(false)
-  const [hasRun, setHasRun] = useState(true)
+  const [hasRun, setHasRun] = useState(false)
   const result = useMemo(() => simulate(scenario, activeAction ? [activeAction] : []), [scenario, activeAction])
   const baseline = useMemo(() => simulate(scenario), [scenario])
   const evaluation = useMemo(() => evaluateRecoveries(scenario), [scenario])
@@ -76,10 +76,11 @@ export default function DominoSky({ initialScenario = getInitialScenario() }: { 
     setDraft(reset); setScenario(reset); setActiveAction(null); setHasRun(true); setSelectedAirport(null); setSelectedFlight(null); setReplayMinute(12 * 60)
   }
   const selectFlight = (flightId: string) => setSelectedFlight(result.flights.find(flight => flight.flight_id === flightId) ?? null)
+  const closeFlightDetail = useCallback(() => setSelectedFlight(null), [])
   const impactDelta = (current: number, before: number) => current === before ? "No change" : `${current - before > 0 ? "+" : ""}${current - before} vs baseline`
 
   return <main className="dashboard" data-theme={theme}>
-    <header className="topbar"><a className="brand" href="/" aria-label="Domino Sky home"><span className="brand-mark"><Plane size={19}/></span><span>Domino <b>Sky</b></span></a><a className="github-link" href="/">Home</a><p className="top-description">Flight disruption cascade and recovery simulator</p><div className="top-actions"><button className="theme-toggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={15}/> : <Moon size={15}/>}<span>{theme === "dark" ? "Light" : "Dark"}</span></button><a className="github-link" href="https://github.com/aryan-and-team/v0-domino-sky-simulator-smKXH9PS2nC" target="_blank" rel="noreferrer">GitHub <ArrowRight size={13}/></a></div></header>
+    <header className="topbar"><a className="brand" href="/" aria-label="Domino Sky home"><span className="brand-mark"><Plane size={19}/></span><span>Domino <b>Sky</b></span></a><a className="github-link" href="/">Home</a><p className="top-description">Flight disruption cascade and recovery simulator</p><div className="top-actions"><button className="theme-toggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={15}/> : <Moon size={15}/>}<span>{theme === "dark" ? "Light" : "Dark"}</span></button><a className="github-link" href="https://github.com/Aryansingh-vs/Domino-sky" target="_blank" rel="noreferrer">GitHub <ArrowRight size={13}/></a></div></header>
 
     <section className="control-sticky" aria-label="Simulation controls"><div className="control-main">
       <label className="control-field"><span>Airport</span><select value={draft.airport} onChange={event => setDraft(value => ({ ...value, airport: event.target.value }))}>{airports.map(airport => <option value={airport.id} key={airport.id}>{airport.id} · {airport.city}</option>)}</select></label>
@@ -122,9 +123,9 @@ export default function DominoSky({ initialScenario = getInitialScenario() }: { 
 
       <div className="support-grid"><StrandedPanel result={result}/><CrewPanel result={result}/></div>
 
-      <footer className="page-footer"><div><a className="brand footer-brand" href="#top"><span className="brand-mark"><Plane size={15}/></span><span>Domino <b>Sky</b></span></a><p>Flight disruption cascade and recovery simulator.</p></div><details className="how-it-works"><summary><CircleHelp size={14}/> How it works</summary><div className="how-content"><p><strong>Closure rule</strong> · All times are minutes after midnight. Departure is the later of its schedule and the previous actual arrival plus 30 minutes. Flights departing from the closed airport inside the half-open window [start, end) wait until reopening; arrivals into a closed airport inside that window hold until reopening. Closure alone never cancels.</p><p><strong>Recovery score</strong> · Departure-delay minutes × {1} + stranded passengers × {3} + crew breaches × {200} + cancellations × {150}. Recommendations are single actions evaluated with the same simulator and shown only when they strictly improve the baseline.</p><p><strong>Passenger and crew rules</strong> · Broken connections are those arriving short of minimum connect time. Passengers on cancelled flights are counted once; connections involving a cancelled flight add no duplicate passengers. Crew duty is last non-cancelled arrival minus duty start; breach means more than 600 minutes.</p><p><strong>Dispatcher</strong> · Gemini receives only engine output. Its numbers and citations are checked against that output; one mismatch retry is allowed, then the deterministic template is used.</p></div></details><a className="footer-github" href="https://github.com/aryan-and-team/v0-domino-sky-simulator-smKXH9PS2nC" target="_blank" rel="noreferrer">View source on GitHub <ArrowRight size={13}/></a></footer>
+      <footer className="page-footer"><div><a className="brand footer-brand" href="#top"><span className="brand-mark"><Plane size={15}/></span><span>Domino <b>Sky</b></span></a><p>Flight disruption cascade and recovery simulator.</p></div><details className="how-it-works"><summary><CircleHelp size={14}/> How it works</summary><div className="how-content"><p><strong>Closure rule</strong> · All times are minutes after midnight. Departure is the later of its schedule and the previous actual arrival plus 30 minutes. Flights departing from the closed airport inside the half-open window [start, end) wait until reopening; arrivals into a closed airport inside that window hold until reopening. Closure alone never cancels.</p><p><strong>Recovery score</strong> · Departure-delay minutes × {1} + stranded passengers × {3} + crew breaches × {200} + cancellations × {150}. Recommendations are single actions evaluated with the same simulator and shown only when they strictly improve the baseline.</p><p><strong>Passenger and crew rules</strong> · Broken connections are those arriving short of minimum connect time. Passengers on cancelled flights are counted once; connections involving a cancelled flight add no duplicate passengers. Crew duty is last non-cancelled arrival minus duty start; breach means more than 600 minutes.</p><p><strong>Dispatcher</strong> · Gemini receives only engine output. Its numbers and citations are checked against that output; one mismatch retry is allowed, then the deterministic template is used.</p></div></details><a className="footer-github" href="https://github.com/Aryansingh-vs/Domino-sky" target="_blank" rel="noreferrer">View source on GitHub <ArrowRight size={13}/></a></footer>
       {hasRun && <span className="sr-only" aria-live="polite">Simulation updated for {scenario.airport}, {scenario.start} to {scenario.end}.</span>}
     </div>
-    <FlightDetail flight={selectedFlight} result={result} onClose={() => setSelectedFlight(null)}/>
+    <FlightDetail flight={selectedFlight} result={result} onClose={closeFlightDetail}/>
   </main>
 }
